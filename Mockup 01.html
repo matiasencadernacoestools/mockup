@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mockup Álbum — Etapa 2 v6</title>
-<style>
+<title>Mockup Álbum — Etapa 2 v7</title>
+<script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=AjDA2w-mX-ZU391SreO7h3HQAH9LVl7yoSvBpGMSkFAai7agpnMQSZAxU74czVRsE7G5xOCXLwG-u1-RSeLBJYTdVRtc9ZmVZ9ZiX75LrTGJ7W0gQY5r5jBk7QKtCjuU3Pubz5dpW5jelE4ylD2PO1FYFfU4H_sdqxePyzhsgH-Bsas9PF35LxDQwappMeOa5z11D8Ctc2lgGlj8x5sFpqV66bkdFA4zQ06ffqwmX3LHfVcJpj8E9usIKk-jqqBzaZlvtKdykSCGqNu59XbxSQ" charset="UTF-8"></script><style>
 *{box-sizing:border-box}
 :root{--gold:#d6a10d;--bg:#eeeeee;--ink:#222}
 body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:#eee;color:var(--ink);overflow:hidden}
@@ -52,7 +52,7 @@ input[type=color]{width:100%;height:34px;padding:3px;background:#fff;border:1px 
 
 <div class="control"><div class="row"><span>Largura do dorso</span><small id="spineLabel">3.5%</small></div><input type="range" id="spine" min="0" max="12" step="0.1" value="3.5"></div>
 
-<div class="control"><div class="row"><span>Tamanho geral</span><small id="sizeLabel">82%</small></div><input type="range" id="size" min="42" max="105" step="1" value="96"></div>
+<div class="control"><div class="row"><span>Tamanho geral</span><small id="sizeLabel">82%</small></div><input type="range" id="size" min="42" max="98" step="1" value="94"></div>
 
 <div class="control"><div class="row"><span>Força da sombra</span><small id="shadowLabel">70</small></div><input type="range" id="shadow" min="0" max="160" step="1" value="70"></div>
 
@@ -122,6 +122,20 @@ function roundedRect(c,x,y,w,h,r){
   c.lineTo(x,y+r);
   c.quadraticCurveTo(x,y,x+r,y);
   c.closePath();
+}
+
+
+function getCoverRatio(parts){
+  // Razão única e compartilhada por capa fechada, fundo fechado e capa/fundo no álbum aberto.
+  // Isso evita que cada mockup calcule sua proporção de forma independente.
+  return parts.cwSrc / parts.ih;
+}
+
+function fitInside(maxW,maxH,ratio){
+  let h=maxH;
+  let w=h*ratio;
+  if(w>maxW){w=maxW;h=w/ratio;}
+  return {w,h};
 }
 
 function drawImageCrop(img,sx,sy,sw,sh,dx,dy,dw,dh,clipRadius=0){
@@ -263,21 +277,21 @@ function drawClosedAlbum(part, slot){
   const cfg=state;
   const parts=splitSource(sourceImg,cfg.spine);
   const cropPart=part==='front'?parts.front:parts.back;
-  const ratio=parts.cwSrc/parts.ih;
+  const ratio=getCoverRatio(parts);
 
-  let h=slot.h*(cfg.size/100)*.88;
-  let w=h*ratio;
-  const maxW=slot.w*.74;
-  const maxH=slot.h*.90;
-  if(w>maxW){w=maxW;h=w/ratio;}
-  if(h>maxH){h=maxH;w=h/ratio;}
+  // Usa sempre cálculo proporcional único: primeiro define o envelope disponível,
+  // depois encaixa mantendo ratio. A espessura fica fora da imagem, não altera a proporção da capa.
+  const thick=Math.max(2, cfg.relief*.075);
+  const maxW=(slot.w*.76)-thick;
+  const maxH=(slot.h*(cfg.size/100)*.88)-thick;
+  const dim=fitInside(maxW,maxH,ratio);
+  const w=dim.w, h=dim.h;
 
-  const x=slot.x+(slot.w-w)/2;
-  const y=slot.y+(slot.h-h)/2-10;
+  const x=slot.x+(slot.w-(w+thick))/2;
+  const y=slot.y+(slot.h-(h+thick))/2-6;
 
   shadowClosed(x,y,w,h,cfg.shadow);
 
-  const thick=Math.max(2, cfg.relief*.075);
   const rc=cfg.reliefColor;
 
   // espessura inferior e direita, controladas e discretas
@@ -315,22 +329,21 @@ function drawClosedAlbum(part, slot){
 function drawOpenAlbum(slot){
   const cfg=state;
   const parts=splitSource(sourceImg,cfg.spine);
-  const ratio=parts.cwSrc/parts.ih;
+  const ratio=getCoverRatio(parts);
 
-  let albumH=slot.h*(cfg.size/100)*.90;
-  let spW=parts.spSrc?albumH*(parts.spSrc/parts.ih):0;
+  const maxTotalW=slot.w*.86;
+  const maxAlbumH=slot.h*(cfg.size/100)*.90;
+
+  // Primeiro calcula pelo limite de altura e depois reduz uniformemente pelo limite de largura.
+  // Nenhuma peça é escalada sozinha: costas, dorso e frente usam o mesmo fator.
+  let albumH=maxAlbumH;
   let cw=albumH*ratio;
+  let spW=parts.spSrc ? albumH*(parts.spSrc/parts.ih) : 0;
   let total=cw*2+spW;
 
-  const maxW=slot.w*.86;
-  const maxH=slot.h*.92;
-  if(total>maxW){
-    const f=maxW/total;
-    albumH*=f; cw*=f; spW*=f; total=maxW;
-  }
-  if(albumH>maxH){
-    const f=maxH/albumH;
-    albumH*=f; cw*=f; spW*=f; total*=f;
+  if(total>maxTotalW){
+    const f=maxTotalW/total;
+    albumH*=f; cw*=f; spW*=f; total=maxTotalW;
   }
 
   const x=slot.x+(slot.w-total)/2;
@@ -344,7 +357,7 @@ function drawOpenAlbum(slot){
     drawDorsoOpen(x+cw,y,spW,albumH,cfg.relief);
   }
   drawImageCrop(sourceImg,parts.front.sx,0,parts.front.sw,parts.ih,x+cw+spW,y,cw,albumH,0);
-  return {x,y,w:total,h:albumH};
+  return {x,y,w:total,h:albumH,coverW:cw,coverH:albumH};
 }
 
 function drawPhotographerLogo(a){
@@ -487,13 +500,14 @@ ui.eyeDrop.addEventListener('click',async()=>{
 ui.download.addEventListener('click',()=>{
   render();
   const a=document.createElement('a');
-  a.download='mockup-album-etapa-2-v6-4k.png';
+  a.download='mockup-album-etapa-2-v7-4k.png';
   a.href=canvas.toDataURL('image/png');
   a.click();
 });
 
 ui.spine.value=state.spine;
-ui.size.value=state.size;
+ui.size.max=98;
+ui.size.value=Math.min(state.size,98);
 ui.shadow.value=state.shadow;
 ui.relief.value=state.relief;
 ui.reliefColor.value=state.reliefColor;
