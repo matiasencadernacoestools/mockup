@@ -73,6 +73,24 @@
       font-size: 14px;
     }
 
+    .version-label {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #7a748d;
+      font-weight: 700;
+    }
+
+    .developer-label {
+      margin-top: 3px;
+      font-size: 12px;
+      color: #7a748d;
+    }
+
+    .developer-label strong {
+      color: var(--text);
+      font-weight: 700;
+    }
+
     .controls {
       max-width: 1280px;
       margin: 18px auto 0;
@@ -186,6 +204,9 @@
       border: 1px solid rgba(255,255,255,0.7);
       padding: var(--card-padding-y, 22px) 16px;
       overflow: hidden;
+      content-visibility: auto;
+      contain-intrinsic-size: var(--card-height, 150px) var(--card-min, 250px);
+      contain: layout paint style;
     }
 
     .sample {
@@ -354,6 +375,8 @@
         <div>
           <h1>Visualizador de Fontes Instaladas</h1>
           <p>Teste suas fontes locais com texto personalizado e filtros simples.</p>
+          <div class="version-label">Versão 1.0</div>
+          <div class="developer-label">Desenvolvido por: <strong>Carlos M. Kill</strong></div>
         </div>
       </div>
 
@@ -378,9 +401,9 @@
       </select>
 
       <div class="zoom-controls" aria-label="Controle de zoom dos cards">
-        <button type="button" class="secondary" onclick="alterarZoom(-1)" title="Menos zoom">−</button>
+        <button id="btnZoomOut" type="button" class="secondary" onclick="alterarZoom(-1)" title="Menos zoom">−</button>
         <span class="zoom-label" id="zoomLabel">100%</span>
-        <button type="button" onclick="alterarZoom(1)" title="Mais zoom">+</button>
+        <button id="btnZoomIn" type="button" onclick="alterarZoom(1)" title="Mais zoom">+</button>
       </div>
 
       <button id="btnGerar" onclick="gerarExibicao()">Gerar exibição</button>
@@ -401,10 +424,6 @@
     </div>
   </main>
 
-  <footer>
-    Desenvolvido por: <strong>Carlos M. Kill</strong>
-  </footer>
-
   <script>
     let fontes = [];
     let carregando = false;
@@ -412,6 +431,8 @@
     let exibicaoPendente = false;
     let timerFiltro = null;
     let zoomNivel = 0;
+    let timerZoom = null;
+    let zoomAplicando = false;
     const zoomMin = -3;
     const zoomMax = 4;
 
@@ -434,6 +455,14 @@
       { family: "Verdana", category: "sans-serif" }
     ];
 
+    function atualizarEstadoZoom() {
+      const btnZoomOut = document.getElementById("btnZoomOut");
+      const btnZoomIn = document.getElementById("btnZoomIn");
+
+      if (btnZoomOut) btnZoomOut.disabled = zoomAplicando || zoomNivel <= zoomMin;
+      if (btnZoomIn) btnZoomIn.disabled = zoomAplicando || zoomNivel >= zoomMax;
+    }
+
     function aplicarZoom() {
       const escala = 1 + (zoomNivel * 0.12);
       const cardMin = Math.round(250 * escala);
@@ -449,13 +478,51 @@
       document.documentElement.style.setProperty("--font-name-gap", `${nameGap}px`);
 
       document.getElementById("zoomLabel").textContent = `${Math.round(escala * 100)}%`;
+      atualizarEstadoZoom();
+    }
+
+    async function aplicarZoomComFeedback() {
+      if (zoomAplicando) return;
+
+      zoomAplicando = true;
+      atualizarEstadoZoom();
+
+      const loader = document.getElementById("loader");
+      const loaderTexto = document.getElementById("loaderTexto");
+      const status = document.getElementById("status");
+
+      loader.classList.add("active");
+      loaderTexto.textContent = "Ajustando zoom...";
+      if (fontes.length) status.textContent = "Reorganizando cards na tela...";
+
+      await aguardarPintura();
+
+      aplicarZoom();
+
+      await aguardarPintura();
+
+      loader.classList.remove("active");
+      if (fontes.length) {
+        const qtd = document.querySelectorAll(".card").length;
+        status.textContent = `${qtd} fontes exibidas.`;
+      }
+
+      zoomAplicando = false;
+      atualizarEstadoZoom();
     }
 
     function alterarZoom(direcao) {
       const novoZoom = Math.max(zoomMin, Math.min(zoomMax, zoomNivel + direcao));
       if (novoZoom === zoomNivel) return;
+
       zoomNivel = novoZoom;
-      aplicarZoom();
+
+      clearTimeout(timerZoom);
+      document.getElementById("zoomLabel").textContent = `${Math.round((1 + (zoomNivel * 0.12)) * 100)}%`;
+
+      timerZoom = setTimeout(() => {
+        aplicarZoomComFeedback();
+      }, 120);
     }
 
     aplicarZoom();
