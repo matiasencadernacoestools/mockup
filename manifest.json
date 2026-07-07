@@ -1,0 +1,25 @@
+{
+  "name": "Harmonia de Cores Básica",
+  "short_name": "Harmonia Cores",
+  "description": "Gerador de paletas harmônicas de cores.",
+  "start_url": "./Harmonia_cor.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "./harmonia-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./harmonia-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
